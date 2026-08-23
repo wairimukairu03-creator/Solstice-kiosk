@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Solstice Check-In Kiosk</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #0f1115; color: #eee; padding: 2rem; }
+  h1 { font-weight: 600; }
+  .card { background: #1a1d24; border-radius: 10px; padding: 1rem 1.25rem; margin: 0.5rem 0; display: flex; justify-content: space-between; align-items: center; }
+  .badge { padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600; }
+  .NOT_CHECKED_IN { background: #333; color: #aaa; }
+  .PRINT_PENDING { background: #7a5b00; color: #ffdd7a; }
+  .CHECKED_IN { background: #14532d; color: #86efac; }
+  .PRINT_FAILED { background: #5b1a1a; color: #fca5a5; }
+  button { background: #4f46e5; border: none; color: white; padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+  <h1>Solstice Events Co. — Check-In Kiosk</h1>
+  <p>Simulates scanning a badge. Status stays <b>PRINT_PENDING</b> until the vendor's webhook confirms the print job.</p>
+  <div id="list"></div>
+
+<script>
+async function loadAttendees() {
+  const res = await fetch('/attendees');
+  const attendees = await res.json();
+  render(attendees);
+}
+
+function render(attendees) {
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  for (const a of attendees) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'card-' + a.id;
+    card.innerHTML = `
+      <div><b>${a.name}</b> <span style="opacity:.6">(${a.id})</span></div>
+      <div style="display:flex; gap:0.75rem; align-items:center;">
+        <span class="badge ${a.state}" id="badge-${a.id}">${a.state}</span>
+        <button onclick="scan('${a.id}')" ${a.state === 'PRINT_PENDING' ? 'disabled' : ''}>Scan</button>
+      </div>`;
+    list.appendChild(card);
+  }
+}
+
+async function scan(id) {
+  const res = await fetch('/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attendeeId: id }),
+  });
+  const data = await res.json();
+  updateCard(data.attendee);
+}
+
+function updateCard(attendee) {
+  const badge = document.getElementById('badge-' + attendee.id);
+  if (!badge) return;
+  badge.textContent = attendee.state;
+  badge.className = 'badge ' + attendee.state;
+  const btn = badge.closest('.card').querySelector('button');
+  btn.disabled = attendee.state === 'PRINT_PENDING';
+}
+
+const sse = new EventSource('/events');
+sse.addEventListener('status_changed', (e) => {
+  const attendee = JSON.parse(e.data);
+  updateCard(attendee);
+});
+
+loadAttendees();
+</script>
+</body>
+</html>
