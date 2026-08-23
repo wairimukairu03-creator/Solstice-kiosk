@@ -32,8 +32,13 @@ function createApp({ seedAttendees, failureRate = 0, port }) {
 
   // Vendor queue: publishing here is a fire-and-forget, non-blocking call.
   // The kiosk service does NOT wait for a print result before responding.
+  //
+  // BASE_URL should be set to the service's own public URL once deployed
+  // (e.g. https://your-app.onrender.com). Falls back to localhost for
+  // local development.
+  const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
   const vendorQueue = startVendorSimulator({
-    webhookUrl: `http://localhost:${port}/webhook/print-callback`,
+    webhookUrl: `${baseUrl}/webhook/print-callback`,
     failureRate,
   });
 
